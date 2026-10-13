@@ -1,10 +1,7 @@
 import random
-from database import create_database
-
+import sqlite3
 
 class Combatant:
-    counter = 0
-
     def __init__(self, name, hp, init_mod, type):
         self.name = name
         self.max_hp = hp
@@ -12,14 +9,7 @@ class Combatant:
         self.init_mod = init_mod # initiative modifer
         self.init = 0 # set default initiative to zero
         self.type = type
-        self.encounter_id = Encounter.counter + 1
 
-        if Combatant.counter == 0:
-            self.id = 1
-        else: 
-            self.id = Combatant.counter + 1
-
-        counter += 1
 
     def damage(self, value: int) -> None:
         if value <= 0:
@@ -74,22 +64,14 @@ class Combatant:
         return self.init < other.init
 
 class Encounter:
-    counter = 0
-    
     def __init__(self):
         self.combatant_list = []
         self.active_combatant_index = 0
         self.round_number = 0
 
-        if Encounter.counter == 0:
-            self.id = 1
-        else:
-            self.id = Encounter.counter + 1
-
-        counter += 1
 
     def add_combatant(self, combatant):
-        self.combatant_list += combatant
+        self.combatant_list.append(combatant)
 
     def remove_combatant(self, combatant):
         for i in range(len(self.combatant_list)):
@@ -103,6 +85,118 @@ class Encounter:
         for mem in self.combatant_list:
             print(mem)
 
+class Database:
+    def __init__(self, DB_NAME="tracker.db"):
+        self.db_name = DB_NAME
 
+    def connect(self):
+        conn = sqlite3.connect(self.db_name)
+        conn.execute("PRAGMA foreign_keys = ON")
+        return conn
 
-create_database()
+    def create_tables(self):
+        with self.conenct() as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS encouters (
+                    id INTERGER PRIMARY KEY,
+                    round_number INTERGER NOT NULL DEFAULT 1,
+                    active_index INTERGER
+                )
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS combatants (
+                    id INTERGER PRIMARY KEY,
+                    encounter_id INTERGER NOT NULL,
+                    position INTERGER NOT NULL,
+                    name TEXT NOT NULL,
+                    max_hp INTERGER NOT NULL,
+                    hp INTERGER NOT NULL,
+                    init_mod INTERGER NOT NULL,
+                    init INTERGER NOT NULL,
+                    type TEXT NOT NULL
+
+                    FOREIGN KEY (encounter_id)
+                        REFERENCES encounters(id)
+                        ON DELETE CASCADE
+                )    
+            """)
+
+            conn.execute("""
+                INSERT OR IGNORE INTO encounters (id, round_number)
+                VALUES (1, 0)
+            """)
+
+    def save_encounter(self, encounter):
+        with self.connect() as conn:
+            conn.execute("PRAGMA foreign_keys = ON")
+
+            conn.execute("""
+                UPDATE encounters
+                SET round_number = ?, active_index = ?
+                WHERE id = 1
+            """, (encounter.round_number, encounter.active_combatant_index))
+
+            conn.execute("""
+                DELETE FROM combatants
+                WHERE encounter_id = 1
+            """)
+
+            for combatant in encounter.combatant_list:
+                conn.execute("""
+                    INSERT INTO combatants (
+                        encounter_id,
+                        name,
+                        max_hp,
+                        hp,
+                        init_mod,
+                        init,
+                        type    
+                    )
+                    VALUES (1, ?, ?, ?, ?, ?, ?)
+                """, (combatant.name, combatant.max_hp, combatant.hp, combatant.init_mod, combatant.init, combatant.type))
+
+    def load_encounter(self):
+        with self.connect() as conn:
+            conn.row_factory = sqlite3.Row
+
+            encounter_row = conn.execute("""
+                SELECT round_number, active_index
+                FROM encounters
+                WHERE id = 1
+            """).fetchone()
+
+            if encounter_row is None:
+                return None
+
+            encounter = Encounter()
+            encounter.round_number = encounter_row["round_number"]
+
+            rows = conn.execute("""
+                SELECT name, position, max_hp, hp, init_mod, init, type
+                FROM combatants
+                WHERE encounter_id = 1
+                ORDER BY id
+            """).fetchall()
+
+            for row in rows:
+                combatant = Combatant(
+                    row["name"],
+                    row["max_hp"],
+                    row["init_mod"],
+                    row["type"]
+                )
+
+                combatant.hp = row["hp"]
+                combatant.init = row["init"]
+
+                encounter.add_combatant(combatant)
+
+            active_index = encounter_row["active_index"]
+
+            if active_index is not None:
+                if 0 <= active_index < len(encounter.combatant_list):
+                    encounter.ative_combatant_index = active_index
+
+            return encounter
+
