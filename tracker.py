@@ -45,6 +45,8 @@ class Combatant:
         
     def roll_init(self) -> int:
         init = random.randint(1,20) + self.init_mod
+        if init <= 0:
+            init = 1
         self.init = init
         return init
     
@@ -61,7 +63,7 @@ class Combatant:
         return f"{self.name} ({self.hp}/{self.max_hp}) HP, ({self.init})"
 
     def __lt__(self, other):
-        return self.init < other.init
+        return self.init > other.init
 
 class Encounter:
     def __init__(self):
@@ -84,6 +86,10 @@ class Encounter:
     def print_turn_order(self):
         for mem in self.combatant_list:
             print(mem)
+
+    def roll_all_initiative(self):
+        for mem in self.combatant_list:
+            mem.roll_init()
 
 class Database:
     def __init__(self, DB_NAME="tracker.db"):
