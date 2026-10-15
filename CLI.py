@@ -1,9 +1,16 @@
-from wsgiref import validate
-
 import questionary
 from tracker import Database, Encounter, Combatant
+import subprocess
+import os
+
+
+def clear_screen():
+    subprocess.run(
+        ["cmd", "/c", "cls"] if os.name == "nt" else ["clear"], check=False)
 
 def sub_menu_questions():
+    clear_screen()
+
     return questionary.select(
         "Please choose an action to do:",
         choices=[
@@ -14,34 +21,35 @@ def sub_menu_questions():
             "Start encounter",
             "Save encounter",
             "Exit"
-        ],).ask() or "do nothing"
+        ], qmark="", instruction="").ask() or "do nothing"
 
 def choice_menu(choice, encounter):
+        clear_screen()
+        
         match choice:
             case "Add combatant":
-                name = questionary.text("Name: ").ask()
-                health = int(questionary.text("Health: ").ask())
-                init_mod = int(questionary.text("Initiative modifier: ").ask())
+                name = questionary.text("Name: ", qmark="", instruction="").ask()
+                health = int(questionary.text("Health: ", qmark="", instruction="").ask())
+                init_mod = int(questionary.text("Initiative modifier: ", qmark="", instruction="").ask())
                 type = questionary.select(
                     "Select combatant tupe: ",
-                    choices=["player", "enemy", "ally"],
-                ).ask()
+                    choices=["player", "enemy", "ally"], qmark="", instruction="").ask()
 
                 encounter.add_combatant(Combatant(name, health, init_mod, type))
                 print(f"Combatant: {name} added succesfully")
-                return "None"
+                return None
             case "Remove combatant":
-                name = questionary.text("Name of combatant you would like to remove: ").ask()
+                name = questionary.text("Name of combatant you would like to remove: ", qmark="", instruction="").ask()
                 encounter.remove_combatant(name)
                 print(f"Succesfully removed {name}")
-                return "None"
+                return None
             case "View turn order":
                 encounter.sort_list()
                 encounter.print_turn_order()
-                return "None"
+                return None
             case "Roll initiative":
                 encounter.roll_all_initiative()
-                return "None"
+                return None
             case "Start encounter":
                 return "Start"
             case "Save encounter":
@@ -49,12 +57,42 @@ def choice_menu(choice, encounter):
             case "Exit":
                 return "Exit"
 
+def active_encounter(encounter):
+    while True:
+        clear_screen()
+        choices = []
+
+        for i, combatant in enumerate(encounter.combatant_list):
+            name = f"▶ {combatant}" if i == encounter.active_combatant_index else f"  {combatant}"
+
+            choices.append(questionary.Choice(
+                title=name,
+                value=combatant
+            ))
+        choices.append("  End Turn")
+        choices.append("  Exit")
+
+        choice = questionary.select("Turn Order:", choices=choices, qmark="", instruction="").ask() or "do nothing"
+
+        if choice == "  End Turn":
+            encounter.advance_turn()
+            continue
+        elif choice == "  Exit":
+            break
+        else:
+            action, value = input(choice).split()
+            if action.lower() == "damage":
+                encounter.combatant_list[encounter.combatant_list.index(choice)].damage(int(value))
+            elif action.lower() == "heal":
+                encounter.combatant_list[encounter.combatant_list.index(choice)].heal(int(value))
+
+
+
 
 if __name__ == "__main__":
     database = Database("test.db")
-
-    if not database.check():
-        database.create_tables()
+    database.create_tables()
+    clear_screen()
 
     while True:
 
@@ -62,7 +100,7 @@ if __name__ == "__main__":
             choices=[
                 "Start new encounter",
                 "Load encounter",
-                "Exit"],).ask() or "do nothing")
+                "Exit"], qmark="", instruction="").ask() or "do nothing")
 
         match action:
             case "Start new encounter":
@@ -71,14 +109,28 @@ if __name__ == "__main__":
                 while True:
                     choice = sub_menu_questions()
                     check = choice_menu(choice, encounter)
-                    if check == "None":
+                    if check == None:
                         continue
                     elif check == "Exit":
                         break
                     elif check == "Save": 
-                        pass
+                        database.save_encounter(encounter)
+                    elif check == "Start":
+                        active_encounter(encounter)
             case "Load encounter":
-                pass
+                encounter  = database.load_encounter()
+
+                while True:
+                    choice = sub_menu_questions()
+                    check = choice_menu(choice, encounter)
+                    if check == None:
+                        continue
+                    elif check == "Exit":
+                        break
+                    elif check == "Save": 
+                        database.save_encounter(encounter)
+                    elif check == "Start":
+                        active_encounter(encounter)
             case "Exit":
                 break
             case _:

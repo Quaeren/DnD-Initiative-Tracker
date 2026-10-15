@@ -1,15 +1,15 @@
 import random
 import sqlite3
+from pathlib import Path
 
 class Combatant:
     def __init__(self, name, hp, init_mod, type):
-        self.name = name
+        self.name = name.strip()
         self.max_hp = hp
         self.hp = hp
         self.init_mod = init_mod # initiative modifer
         self.init = 0 # set default initiative to zero
         self.type = type
-
 
     def damage(self, value: int) -> None:
         if value <= 0:
@@ -57,7 +57,7 @@ class Combatant:
         if not name.strip():
             raise ValueError("Name cannnot be empty")
         
-        self.name = name
+        self.name = name.strip()
 
     def __str__(self):
         return f"{self.name} ({self.hp}/{self.max_hp}) HP, ({self.init})"
@@ -91,9 +91,15 @@ class Encounter:
         for mem in self.combatant_list:
             mem.roll_init()
 
+    def advance_turn(self):
+        self.active_combatant_index += 1
+
 class Database:
-    def __init__(self, DB_NAME="tracker.db"):
-        self.db_name = DB_NAME
+    def __init__(self, db_name="tracker.db"):
+        self.db_name = db_name
+
+    def check(self):
+        return Path(self.db_name).exists()
 
     def connect(self):
         conn = sqlite3.connect(self.db_name)
@@ -101,26 +107,25 @@ class Database:
         return conn
 
     def create_tables(self):
-        with self.conenct() as conn:
+        with self.connect() as conn:
             conn.execute("""
-                CREATE TABLE IF NOT EXISTS encouters (
-                    id INTERGER PRIMARY KEY,
-                    round_number INTERGER NOT NULL DEFAULT 1,
-                    active_index INTERGER
+                CREATE TABLE IF NOT EXISTS encounters (
+                    id INTEGER PRIMARY KEY,
+                    round_number INTEGER NOT NULL DEFAULT 0,
+                    active_index INTEGER
                 )
             """)
 
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS combatants (
-                    id INTERGER PRIMARY KEY,
-                    encounter_id INTERGER NOT NULL,
-                    position INTERGER NOT NULL,
+                    id INTEGER PRIMARY KEY,
+                    encounter_id INTEGER NOT NULL,
                     name TEXT NOT NULL,
-                    max_hp INTERGER NOT NULL,
-                    hp INTERGER NOT NULL,
-                    init_mod INTERGER NOT NULL,
-                    init INTERGER NOT NULL,
-                    type TEXT NOT NULL
+                    max_hp INTEGER NOT NULL,
+                    hp INTEGER NOT NULL,
+                    init_mod INTEGER NOT NULL,
+                    init INTEGER NOT NULL,
+                    type TEXT NOT NULL,
 
                     FOREIGN KEY (encounter_id)
                         REFERENCES encounters(id)
@@ -179,7 +184,7 @@ class Database:
             encounter.round_number = encounter_row["round_number"]
 
             rows = conn.execute("""
-                SELECT name, position, max_hp, hp, init_mod, init, type
+                SELECT name, max_hp, hp, init_mod, init, type
                 FROM combatants
                 WHERE encounter_id = 1
                 ORDER BY id
@@ -202,7 +207,6 @@ class Database:
 
             if active_index is not None:
                 if 0 <= active_index < len(encounter.combatant_list):
-                    encounter.ative_combatant_index = active_index
+                    encounter.active_combatant_index = active_index
 
             return encounter
-
