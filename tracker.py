@@ -75,9 +75,14 @@ class Encounter:
     def add_combatant(self, combatant):
         self.combatant_list.append(combatant)
 
-    def remove_combatant(self, combatant):
-        for i in range(len(self.combatant_list)):
-            if self.combatant_list[i] == combatant:
+    def remove_combatant(self, removee):
+        for i, combatant in enumerate(self.combatant_list):
+            if combatant == removee:
+                if self.combatant_list.index(removee) == self.active_combatant_index:
+                    self.active_combatant_index += 1
+                    if self.active_combatant_index > (len(self.combatant_list) - 1):
+                        self.active_combatant_index = 0
+                        self.round_number += 1
                 del self.combatant_list[i]
 
     def sort_list(self):
@@ -93,6 +98,20 @@ class Encounter:
 
     def advance_turn(self):
         self.active_combatant_index += 1
+
+        if self.active_combatant_index >= len(self.combatant_list):
+            self.active_combatant_index = 0
+            self.round_number += 1
+
+        while self.combatant_list[self.active_combatant_index].hp == 0:
+            self.active_combatant_index += 1
+
+            if self.active_combatant_index >= len(self.combatant_list):
+                self.active_combatant_index = 0
+                self.round_number += 1
+
+    def reset_round_number(self):
+        self.round_number = 0
 
 class Database:
     def __init__(self, db_name="tracker.db"):
