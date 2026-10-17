@@ -1,6 +1,6 @@
 import questionary
 from questionary import Separator
-from tracker import Database, Encounter, Combatant
+from .tracker import Database, Encounter, Combatant
 import subprocess
 import os
 
@@ -114,14 +114,16 @@ def active_encounter(encounter):
                 encounter.combatant_list[encounter.combatant_list.index(choice)].damage(int(value))
             elif action.lower() == "heal":
                 encounter.combatant_list[encounter.combatant_list.index(choice)].heal(int(value))
+            elif action.lower() == "set":
+                encounter.combatant_list[encounter.combatant_list.index(choice)].set_init(int(value))
             elif action.lower() == "exit":
                 continue
 
 
 
 
-if __name__ == "__main__":
-    database = Database("test.db")
+def main():
+    database = Database()
     database.create_tables()
     clear_screen()
 
@@ -175,3 +177,6 @@ if __name__ == "__main__":
                 break
             case _:
                 print("No option chosen")
+
+if __name__ == "__main__":
+    main()

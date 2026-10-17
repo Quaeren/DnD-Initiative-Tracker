@@ -86,8 +86,8 @@ class Encounter:
                 del self.combatant_list[i]
 
     def sort_list(self):
-        self.combatant_list.sort() # Later add way to check if creature health is 0 and don't sort them
-
+        self.combatant_list.sort()
+        
     def print_turn_order(self):
         for mem in self.combatant_list:
             print(mem)
